@@ -5,9 +5,9 @@ DNS forward server based on nginx stream module implementation.
 ## Installation
 
 ```
-	$ cd nginx-1.x.x
-	$ ./configure --prefix=/root/nginx_sty/nginx_bin --add-module=/path/ngx_stream_dns_proxy_module --with-stream
-    $ make && make install
+$ cd nginx-1.x.x
+$ ./configure --prefix=/root/nginx_sty/nginx_bin --add-module=/path/ngx_stream_dns_proxy_module --with-stream
+$ make && make install
 
 ```
 
