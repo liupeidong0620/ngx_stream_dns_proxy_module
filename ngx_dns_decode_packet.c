@@ -182,7 +182,7 @@ ngx_dns_read_record(ngx_pool_t *pool, ngx_int_t type,
     } else {
         (*dns_rr)->rdata.data = ngx_palloc(pool, (*dns_rr)->rdlength);
         (*dns_rr)->rdata.len = (*dns_rr)->rdlength;
-        ngx_memcpy((*dns_rr)->rdata.data, packet, (*dns_rr)->rdata.len);
+        ngx_memcpy((*dns_rr)->rdata.data, packet + i, (*dns_rr)->rdata.len);
         i += (*dns_rr)->rdlength;
     }
 
@@ -252,9 +252,18 @@ ngx_stream_parse_dns_package(ngx_stream_session_t *s, ngx_chain_t *in,
     ngx_connection_t                *c, *pc;
     ngx_stream_dns_proxy_ctx_t      *ctx;
     ngx_stream_upstream_t           *u;
+    uint16_t packet_len = 0;
     //int ret = 0;
 
     if (in == NULL || s == NULL) {
+        return;
+    }
+
+    if(in->buf == NULL || in->buf->last <= in->buf->pos) {
+        return;
+    }
+    packet_len = in->buf->last - in->buf->pos;
+    if(packet_len <= PACKET_DATABEGIN) {
         return;
     }
 
@@ -270,13 +279,13 @@ ngx_stream_parse_dns_package(ngx_stream_session_t *s, ngx_chain_t *in,
     if (from_upstream) {
         if(c->type == SOCK_DGRAM) {
             ngx_dns_decode_packet(c->pool, in->buf->pos, 
-                    in->buf->last - in->buf->pos, &(ctx->answer_msg));
+                    packet_len, &(ctx->answer_msg));
             /*ngx_log_debug3(NGX_LOG_DEBUG_STREAM, c->log, 0,
                     "ngx_stream_parse_dns_package(): from_upstram: %d, SOCK_DGRAM, packet_len: %d, ret: %d", 
                     from_upstream, in->buf->last - in->buf->pos, ret);*/
         } else {
             ngx_dns_decode_packet(c->pool, in->buf->pos + 2, 
-                    in->buf->last - in->buf->pos - 2, &(ctx->answer_msg));
+                    packet_len - 2, &(ctx->answer_msg));
             /*ngx_log_debug3(NGX_LOG_DEBUG_STREAM, c->log, 0,
                     "ngx_stream_parse_dns_package(): from_upstram: %d, SOCK_STREAM, packet_len: %d, ret: %d", 
                     from_upstream, in->buf->last - in->buf->pos, ret);*/
@@ -284,13 +293,13 @@ ngx_stream_parse_dns_package(ngx_stream_session_t *s, ngx_chain_t *in,
     } else {
         if(pc->type == SOCK_DGRAM) {
             ngx_dns_decode_packet(c->pool, in->buf->pos, 
-                    in->buf->last - in->buf->pos, &(ctx->question_msg));
+                    packet_len, &(ctx->question_msg));
             /*ngx_log_debug3(NGX_LOG_DEBUG_STREAM, c->log, 0,
                     "ngx_stream_parse_dns_package(): from_upstram: %d, SOCK_DGRAM, packet_len: %d, ret: %d", 
                     from_upstream, in->buf->last - in->buf->pos, ret);*/
         } else {
             ngx_dns_decode_packet(c->pool, in->buf->pos + 2, 
-                    in->buf->last - in->buf->pos - 2, &(ctx->question_msg));
+                    packet_len - 2, &(ctx->question_msg));
             /*ngx_log_debug3(NGX_LOG_DEBUG_STREAM, c->log, 0,
                     "ngx_stream_parse_dns_package(): from_upstram: %d, SOCK_STREAM, packet_len: %d, ret: %d", 
                     from_upstream, in->buf->last - in->buf->pos, ret);*/

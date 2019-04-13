@@ -459,7 +459,8 @@ ngx_stream_dns_proxy_init_upstream(ngx_stream_session_t *s)
                 cl->buf->pos = b->last;
                 cl->buf->last = b->last + buf_len + 2;
                 b->last = b->last + buf_len + 2;
-                ctx->from_downstream = cl;
+                cl->buf->temporary = (buf_len ? 1 : 0);
+                //ctx->from_downstream = cl;
             } else {
                 *cl->buf = *c->buffer;
             }
@@ -705,6 +706,9 @@ ngx_stream_dns_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
             if (*out || *busy || dst->buffered) {
                 c->log->action = send_action;
 
+                ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
+                   "stream top filter: l: %d", (*out)->buf->last - (*out)->buf->pos);
+
                 rc = ngx_stream_top_filter(s, *out, from_upstream);
 
                 if (rc == NGX_ERROR) {
@@ -813,6 +817,7 @@ ngx_stream_dns_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
                         temp_len = htons((uint16_t)n);
                         ngx_memcpy(b->last, (char *)&temp_len, 2);
                     }
+                    n += 2;
                 } else {
                     n = src->recv(src, b->last, size);
                 }
@@ -1234,9 +1239,9 @@ ngx_stream_dns_proxy_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (cf->args->nelts > 2) {
         protocol = &value[2];
-        if (ngx_strncasecmp(protocol->data, (void *)"tcp", 3)) {
+        if (!ngx_strncasecmp(protocol->data, (void *)"tcp", 3)) {
             pscf->type = SOCK_STREAM;
-        } else if (ngx_strncasecmp(protocol->data, (void *)"udp", 3)) {
+        } else if (!ngx_strncasecmp(protocol->data, (void *)"udp", 3)) {
             pscf->type = SOCK_DGRAM;
         } else {
             return NGX_CONF_ERROR;
@@ -1319,12 +1324,13 @@ ngx_stream_variable_dns_answer_context(ngx_stream_session_t *s,
         context_len += 20;
     }
 
-    context_len += 12;
+    //context_len += 12;
     context.data = ngx_palloc(s->connection->pool, context_len);
 
     part = &(ctx->answer_msg.answer->part);
     answer = (ngx_dns_rr_t *)part->elts;
-    p = ngx_snprintf(context.data, context_len, "DNS ANSWER: ");
+    p = context.data;
+    //p = ngx_snprintf(context.data, context_len, "DNS ANSWER: ");
     // pos += p - context.data;
     for(i = 0; ; i ++) {
         ip_len = 0;
@@ -1338,13 +1344,13 @@ ngx_stream_variable_dns_answer_context(ngx_stream_session_t *s,
             i = 0;
         }
         if(answer[i].rtype == TypeA) {
-            ngx_memcpy(ntext, answer[i].rdata.data, answer[i].rdata.len);
+            ngx_memcpy(ntext, answer[i].rdata.data, answer[i].rdata.len + 1);
             ntext[answer[i].rdata.len] = '\0';
             ip_len = ngx_inet_ntop(AF_INET, ntext, text, NGX_INET_ADDRSTRLEN);
         } else if(answer[i].rtype == TypeAAAA) {
             ngx_memcpy(ntext, answer[i].rdata.data, answer[i].rdata.len);
             ntext[answer->rdata.len] = '\0';
-            ip_len = ngx_inet_ntop(AF_INET, ntext, text, NGX_INET6_ADDRSTRLEN);
+            ip_len = ngx_inet_ntop(AF_INET6, ntext, text, NGX_INET6_ADDRSTRLEN);
         }
 
         if(ip_len != 0) {
@@ -1411,7 +1417,8 @@ ngx_stream_variable_dns_question_context(ngx_stream_session_t *s,
     }
 
     question = (ngx_dns_question_t *)part->elts;
-    p = ngx_snprintf(context.data, context_len, "DNS QUESTION: "); 
+    //p = ngx_snprintf(context.data, context_len, "DNS QUESTION: "); 
+    p = context.data;
     p = ngx_cpymem(p, question->name.data, question->name.len);
     p = ngx_snprintf(p, context_len, " %s %s",
             ngx_dns_class_type_string(question->qclass),
