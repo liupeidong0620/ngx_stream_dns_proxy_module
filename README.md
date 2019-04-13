@@ -5,15 +5,49 @@ DNS forward server based on nginx stream module implementation.
 ## Installation
 
 ```
-#
-# download the newest source
-# @see http://nginx.org/en/download.html
-#
+	$ cd nginx-1.x.x
+	$ ./configure --prefix=/root/nginx_sty/nginx_bin --add-module=/path/ngx_stream_dns_proxy_module --with-stream
+    $ make && make install
 
-git clone https://github.com/liupeidong0620/ngx_stream_dns_proxy_module.git
-
-./configure --prefix=/root/nginx_sty/nginx_bin --add-module=/path/ngx_stream_dns_proxy_module --with-stream
 ```
+
+## Configuration directives
+
+### `dns_proxy_pass`
+
+- **syntax**: `dns_proxy_pass address tcp|udp`
+- **default**: `-`
+- **context**: `server`
+
+Sets the address of a proxied server. The address can be specified as IP address, and a port.
+
+### `dns_proxy_connect_timeout`
+
+- **syntax**: `dns_proxy_connect_timeout timeout`
+- **default**: `6s`
+- **context**: `stream`,`server`
+
+Defines a timeout for establishing a connection with a proxied server.
+
+### `dns_proxy_timeout`
+
+- **syntax**: `dns_proxy_timeout timeout`
+- **default**: `6s`
+- **context**: `stream`,`server`
+
+Sets the timeout between two successive read or write operations on client or proxied server connections. If no data is transmitted within this time, the connection is closed.
+
+
+## Variables
+
+### `$dns_answer_context`
+
+Formatting DNS answer content.
+
+### `$dns_question_context`
+
+Formatting DNS query content.
+
 ## Usage
 
 ```
@@ -21,8 +55,8 @@ stream {
 	log_format dnsfmt 'DNS Question: $dns_question_context DNS Answer: $dns_answer_context';
 	server {
 		listen 53 udp;
-		# dns_proxy_pass dns tcp;
-		dns_proxy_pass dns;
+		# dns_proxy_pass 114.114.114.114:53 tcp;
+		dns_proxy_pass 114.114.114.114:53;
 		access_log /root/nginx_sty/nginx_bin/logs/dns-access.log dnsfmt;
 	}
 
