@@ -30,7 +30,7 @@ typedef struct {
     uint16_t    rclass;
     uint32_t    rttl;
     uint16_t    rdlength;
-    ngx_str_t   rdata;
+    void        *rdata;
 } ngx_dns_rr_t;
 
 typedef struct {
@@ -46,10 +46,40 @@ typedef struct {
     ngx_list_t *answer;
     ngx_list_t *ns;
     ngx_list_t *extra;
-}ngx_dns_msg_t;
+} ngx_dns_msg_t;
+
+typedef struct {
+    ngx_str_t ns;
+    ngx_str_t mbox;
+    uint32_t serial;
+    uint32_t refresh;
+    uint32_t retry;
+    uint32_t expire;
+    uint32_t minttl;
+} ngx_dns_soa_t;
+
+typedef struct {
+    uint16_t preference;
+    ngx_str_t mx;
+} ngx_dns_mx_t;
 
 void
 ngx_stream_parse_dns_package(ngx_stream_session_t *s, ngx_chain_t *in,
         ngx_uint_t from_upstream);
+
+ngx_str_t 
+ngx_dns_soatostring(ngx_pool_t *pool, ngx_str_t data);
+
+ngx_str_t 
+ngx_dns_mxtostring(ngx_pool_t *pool, ngx_str_t data);
+
+ngx_str_t
+ngx_dns_atostring(ngx_pool_t *pool, ngx_str_t data);
+
+ngx_str_t
+ngx_dns_aaaatostring(ngx_pool_t *pool, ngx_str_t data);
+
+ngx_str_t 
+ngx_dns_cnametostring(ngx_pool_t *pool, ngx_str_t data);
 
 #endif /* NGX_STREAM_DNS_MODULE_H */
