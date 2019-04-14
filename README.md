@@ -37,14 +37,21 @@ Defines a timeout for establishing a connection with a proxied server.
 
 Sets the timeout between two successive read or write operations on client or proxied server connections. If no data is transmitted within this time, the connection is closed.
 
+### `dns_decode_packet_enable`
+
+- **syntax**: `dns_decode_packet_enable on|off`
+- **default**: `on`
+- **context**: `stream`,`server`
+
+'dns_decode_pacet_enable' is set to off, all variables are invalidated
 
 ## Variables
 
-### `$dns_answer_context`
+### `$dns_answer_content`
 
-Formatting DNS answer content.
+Formatting DNS answer content.(support only A and AAAA)
 
-### `$dns_question_context`
+### `$dns_question_content`
 
 Formatting DNS query content.
 
@@ -52,7 +59,7 @@ Formatting DNS query content.
 
 ```
 stream {
-	log_format dnsfmt 'DNS Question: $dns_question_context DNS Answer: $dns_answer_context';
+	log_format dnsfmt 'DNS Question: $dns_question_content DNS Answer: $dns_answer_content';
 	server {
 		listen 53 udp;
 		# dns_proxy_pass 114.114.114.114:53 tcp;

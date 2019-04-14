@@ -72,11 +72,11 @@ ngx_stream_dns_add_vars(ngx_conf_t* cf);
 
 static ngx_stream_variable_t  ngx_stream_dns_variables[] = {
 
-    { ngx_string("dns_answer_context"), NULL,
+    { ngx_string("dns_answer_content"), NULL,
       ngx_stream_variable_dns_answer_context, 0,
       0, 0 },
 
-    { ngx_string("dns_question_context"), NULL,
+    { ngx_string("dns_question_content"), NULL,
       ngx_stream_variable_dns_question_context, 0,
       0, 0 },
 
@@ -104,6 +104,13 @@ static ngx_command_t  ngx_stream_dns_proxy_commands[] = {
       ngx_conf_set_msec_slot,
       NGX_STREAM_SRV_CONF_OFFSET,
       offsetof(ngx_stream_dns_proxy_srv_conf_t, timeout),
+      NULL },
+
+    { ngx_string("dns_decode_packet_enable"),
+      NGX_STREAM_MAIN_CONF|NGX_STREAM_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_stream_dns_proxy_srv_conf_t, decode_packet_enable),
       NULL },
 
     /*{ ngx_string("dns_proxy_buffer_size"),
@@ -1177,6 +1184,7 @@ ngx_stream_dns_proxy_create_srv_conf(ngx_conf_t *cf)
     conf->next_upstream_tries = NGX_CONF_UNSET_UINT;
     conf->next_upstream = NGX_CONF_UNSET;
     conf->type = NGX_CONF_UNSET;
+    conf->decode_packet_enable = NGX_CONF_UNSET;
 
     return conf;
 }
@@ -1202,6 +1210,9 @@ ngx_stream_dns_proxy_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_uint_value(conf->next_upstream_tries,
                               prev->next_upstream_tries, 0);
+
+    ngx_conf_merge_value(conf->decode_packet_enable,
+                              prev->decode_packet_enable, 1);
 
     return NGX_CONF_OK;
 }
@@ -1256,9 +1267,14 @@ ngx_stream_dns_write_filter(ngx_stream_session_t *s, ngx_chain_t *in,
     ngx_uint_t from_upstream)
 {
     ngx_int_t ret = 0;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
 
     //ngx_log_debug0(NGX_LOG_DEBUG_STREAM, s->connection->log, 0, "ngx_stream_dns_write_filter() start ...");
-    ngx_stream_parse_dns_package(s, in, from_upstream);
+    if(pscf != NULL && pscf->decode_packet_enable) {
+        ngx_stream_parse_dns_package(s, in, from_upstream);
+    }
     //ngx_log_debug0(NGX_LOG_DEBUG_STREAM, s->connection->log, 0, "ngx_stream_dns_write_filter() stop ...");
 
     ret = ngx_stream_next_filter(s, in, from_upstream);
@@ -1289,6 +1305,12 @@ ngx_stream_variable_dns_answer_context(ngx_stream_session_t *s,
     ngx_uint_t i = 0;
     size_t ip_len = 0;
     u_char *p = NULL;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfind;
+    }
 
     ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
 
@@ -1351,6 +1373,8 @@ ngx_stream_variable_dns_answer_context(ngx_stream_session_t *s,
             ngx_memcpy(ntext, answer[i].rdata.data, answer[i].rdata.len);
             ntext[answer->rdata.len] = '\0';
             ip_len = ngx_inet_ntop(AF_INET6, ntext, text, NGX_INET6_ADDRSTRLEN);
+        } else {
+            continue;
         }
 
         if(ip_len != 0) {
@@ -1393,6 +1417,13 @@ ngx_stream_variable_dns_question_context(ngx_stream_session_t *s,
     ngx_str_t context;
     ngx_int_t context_len;
     ngx_list_part_t *part;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfind;
+    }
 
     ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
 

@@ -20,6 +20,8 @@ typedef struct {
 
     int                              type;
 
+    ngx_flag_t                       decode_packet_enable;
+
     ngx_stream_upstream_srv_conf_t  *upstream;
 
 } ngx_stream_dns_proxy_srv_conf_t;
