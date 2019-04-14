@@ -43,7 +43,7 @@ Sets the timeout between two successive read or write operations on client or pr
 - **default**: `on`
 - **context**: `stream`,`server`
 
-'dns_decode_pacet_enable' is set to off, all variables are invalidated
+`dns_decode_pacet_enable` is set to off, all variables are invalidated
 
 ## Variables
 
@@ -104,3 +104,8 @@ access_lout output:
 # cat dns-access.log
 DNS Question: www.baidu.com IN A DNS Answer: www.baidu.com 782 IN CNAME www.a.shifen.com; www.a.shifen.com 103 IN A 61.135.169.125; www.a.shifen.com 103 IN A 61.135.169.121;
 ```
+
+## TODO
+
+* dns cache
+* dns crypt
