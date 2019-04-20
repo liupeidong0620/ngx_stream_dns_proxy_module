@@ -70,14 +70,78 @@ ngx_stream_variable_dns_question_context(ngx_stream_session_t *s,
 static ngx_int_t
 ngx_stream_dns_add_vars(ngx_conf_t* cf);
 
+static ngx_int_t
+ngx_stream_variable_dns_question_id(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data);
+
+static ngx_int_t
+ngx_stream_variable_dns_question_flags(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data);
+
+static ngx_int_t
+ngx_stream_variable_dns_answer_reply_code(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data);
+
+static ngx_int_t
+ngx_stream_variable_dns_answer_flags(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data);
+
+static ngx_int_t
+ngx_stream_variable_dns_question_num(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data);
+
+static ngx_int_t
+ngx_stream_variable_dns_answer_num(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data);
+
+static ngx_int_t
+ngx_stream_variable_dns_authority_num(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data);
+
+static ngx_int_t
+ngx_stream_variable_dns_additional_num(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data);
+
 static ngx_stream_variable_t  ngx_stream_dns_variables[] = {
 
     { ngx_string("dns_answer_content"), NULL,
       ngx_stream_variable_dns_answer_context, 0,
       0, 0 },
 
-    { ngx_string("dns_question_content"), NULL,
+    { ngx_string("dns_query_content"), NULL,
       ngx_stream_variable_dns_question_context, 0,
+      0, 0 },
+
+    { ngx_string("dns_query_id"), NULL,
+      ngx_stream_variable_dns_question_id, 0,
+      0, 0 },
+
+    { ngx_string("dns_query_flags"), NULL,
+      ngx_stream_variable_dns_question_flags, 0,
+      0, 0 },
+
+    { ngx_string("dns_reply_code"), NULL,
+      ngx_stream_variable_dns_answer_reply_code, 0,
+      0, 0 },
+
+    { ngx_string("dns_reply_flags"), NULL,
+      ngx_stream_variable_dns_answer_flags, 0,
+      0, 0 },
+
+    { ngx_string("dns_question_num"), NULL,
+      ngx_stream_variable_dns_question_num, 0,
+      0, 0 },
+
+    { ngx_string("dns_answer_num"), NULL,
+      ngx_stream_variable_dns_answer_num, 0,
+      0, 0 },
+
+    { ngx_string("dns_authority_num"), NULL,
+      ngx_stream_variable_dns_authority_num, 0,
+      0, 0 },
+
+    { ngx_string("dns_additional_num"), NULL,
+      ngx_stream_variable_dns_additional_num, 0,
       0, 0 },
 
     { ngx_null_string, NULL, NULL, 0, 0, 0 }
@@ -1439,6 +1503,167 @@ notfind:
 }
 
 static ngx_int_t
+ngx_stream_variable_dns_question_id(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data)
+{
+    ngx_stream_dns_proxy_ctx_t  *ctx;
+    u_char *p = NULL;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+    ngx_str_t str;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfound;
+    }
+
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
+
+    if (ctx == NULL) {
+        goto notfound;
+    }
+
+    str.data = ngx_palloc(s->connection->pool, 6);
+    if(str.data == NULL) {
+        goto notfound;
+    }
+    p = ngx_snprintf(str.data, 6, "%d", ctx->question_msg.hdr.id);
+    str.len = p - str.data;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = str.len;
+    v->data = str.data;
+
+    return NGX_OK;
+notfound:
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_stream_variable_dns_question_flags(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data)
+{
+    ngx_stream_dns_proxy_ctx_t  *ctx;
+    u_char *p = NULL;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+    ngx_str_t str;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfound;
+    }
+
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
+
+    if (ctx == NULL) {
+        goto notfound;
+    }
+
+    str.data = ngx_palloc(s->connection->pool, 5);
+    if(str.data == NULL) {
+        goto notfound;
+    }
+    p = ngx_snprintf(str.data, 6, "%d", ctx->question_msg.hdr.flags);
+    str.len = p - str.data;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = str.len;
+    v->data = str.data;
+
+    return NGX_OK;
+notfound:
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_stream_variable_dns_answer_reply_code(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data)
+{
+    ngx_stream_dns_proxy_ctx_t  *ctx;
+    u_char *p = NULL;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+    ngx_str_t str;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfound;
+    }
+
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
+
+    if (ctx == NULL) {
+        goto notfound;
+    }
+
+    str.data = ngx_palloc(s->connection->pool, 10);
+    if(str.data == NULL) {
+        goto notfound;
+    }
+    p = ngx_snprintf(str.data, 10, "%s", 
+            ngx_dns_rcode_type_string(GET_RCODE(ctx->answer_msg.hdr.flags)));
+    str.len = p - str.data;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = str.len;
+    v->data = str.data;
+
+    return NGX_OK;
+notfound:
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_stream_variable_dns_answer_flags(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data)
+{
+    ngx_stream_dns_proxy_ctx_t  *ctx;
+    u_char *p = NULL;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+    ngx_str_t str;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfound;
+    }
+
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
+
+    if (ctx == NULL) {
+        goto notfound;
+    }
+
+    str.data = ngx_palloc(s->connection->pool, 6);
+    if(str.data == NULL) {
+        goto notfound;
+    }
+    p = ngx_snprintf(str.data, 6, "%d", ctx->answer_msg.hdr.flags);
+    str.len = p - str.data;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = str.len;
+    v->data = str.data;
+
+    return NGX_OK;
+notfound:
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
+static ngx_int_t
 ngx_stream_variable_dns_question_context(ngx_stream_session_t *s,
      ngx_stream_variable_value_t *v, uintptr_t data)
 {
@@ -1495,6 +1720,166 @@ ngx_stream_variable_dns_question_context(ngx_stream_session_t *s,
 
     return NGX_OK;
 notfind:
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_stream_variable_dns_question_num(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data)
+{
+    ngx_stream_dns_proxy_ctx_t  *ctx;
+    u_char *p = NULL;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+    ngx_str_t str;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfound;
+    }
+
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
+
+    if (ctx == NULL) {
+        goto notfound;
+    }
+
+    str.data = ngx_palloc(s->connection->pool, 6);
+    if(str.data == NULL) {
+        goto notfound;
+    }
+    p = ngx_snprintf(str.data, 6, "%d", ctx->question_msg.hdr.question);
+    str.len = p - str.data;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = str.len;
+    v->data = str.data;
+
+    return NGX_OK;
+notfound:
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_stream_variable_dns_answer_num(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data)
+{
+    ngx_stream_dns_proxy_ctx_t  *ctx;
+    u_char *p = NULL;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+    ngx_str_t str;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfound;
+    }
+
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
+
+    if (ctx == NULL) {
+        goto notfound;
+    }
+
+    str.data = ngx_palloc(s->connection->pool, 6);
+    if(str.data == NULL) {
+        goto notfound;
+    }
+    p = ngx_snprintf(str.data, 6, "%d", ctx->answer_msg.hdr.answer);
+    str.len = p - str.data;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = str.len;
+    v->data = str.data;
+
+    return NGX_OK;
+notfound:
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_stream_variable_dns_authority_num(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data)
+{
+    ngx_stream_dns_proxy_ctx_t  *ctx;
+    u_char *p = NULL;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+    ngx_str_t str;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfound;
+    }
+
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
+
+    if (ctx == NULL) {
+        goto notfound;
+    }
+
+    str.data = ngx_palloc(s->connection->pool, 6);
+    if(str.data == NULL) {
+        goto notfound;
+    }
+    p = ngx_snprintf(str.data, 6, "%d", ctx->answer_msg.hdr.authority);
+    str.len = p - str.data;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = str.len;
+    v->data = str.data;
+
+    return NGX_OK;
+notfound:
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
+static ngx_int_t
+ngx_stream_variable_dns_additional_num(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data)
+{
+    ngx_stream_dns_proxy_ctx_t  *ctx;
+    u_char *p = NULL;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+    ngx_str_t str;
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfound;
+    }
+
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
+
+    if (ctx == NULL) {
+        goto notfound;
+    }
+
+    str.data = ngx_palloc(s->connection->pool, 6);
+    if(str.data == NULL) {
+        goto notfound;
+    }
+    p = ngx_snprintf(str.data, 6, "%d", ctx->answer_msg.hdr.additional);
+    str.len = p - str.data;
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = str.len;
+    v->data = str.data;
+
+    return NGX_OK;
+notfound:
 
     v->not_found = 1;
     return NGX_OK;
