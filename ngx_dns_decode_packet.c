@@ -37,6 +37,13 @@ static int
 ngx_dns_decode_packet(ngx_pool_t *pool, u_char *packet, 
         uint16_t packet_len, ngx_dns_msg_t *msg);
 
+static void*
+ngx_dns_decode_rrdata(ngx_pool_t *pool, u_char *packet, 
+        uint16_t packet_len, uint16_t index, ngx_dns_rr_t rr);
+
+static ngx_str_t
+ngx_dns_ntop(ngx_pool_t *pool, u_char *start, uint16_t len, int rtype);
+
 static int
 ngx_dns_get_objname(ngx_pool_t *pool, u_char *packet, uint16_t packet_len,
         uint16_t index, ngx_str_t *name)
@@ -135,6 +142,126 @@ ngx_dns_decode_header(u_char *packet, uint16_t packet_len,
     return 0;
 }
 
+static ngx_str_t
+ngx_dns_ntop(ngx_pool_t *pool, u_char *start, uint16_t len, int rtype)
+{
+    ngx_str_t res = ngx_null_string;
+    u_char text[NGX_INET6_ADDRSTRLEN + 1] = {};
+    u_char ntext[NGX_INET6_ADDRSTRLEN + 1] = {};
+    int ip_len = 0;
+
+    if(rtype == TypeA) {
+        ngx_memcpy(ntext, start, len);
+        ntext[len] = '\0';
+        ip_len = ngx_inet_ntop(AF_INET, ntext, text, NGX_INET_ADDRSTRLEN);
+    } else if(rtype == TypeAAAA) {
+        ngx_memcpy(ntext, start, len);
+        ntext[len] = '\0';
+        ip_len = ngx_inet_ntop(AF_INET6, ntext, text, NGX_INET6_ADDRSTRLEN);
+    }
+
+    if (ip_len > 0) {
+        res.data = ngx_palloc(pool, ip_len);
+        if(res.data == NULL) {
+            return res;
+        }
+        ngx_memcpy(res.data, text, ip_len);
+        res.len = ip_len;
+    }
+
+    return res;
+}
+
+static void*
+ngx_dns_decode_rrdata(ngx_pool_t *pool, u_char *packet, 
+        uint16_t packet_len, uint16_t index, ngx_dns_rr_t rr)
+{
+    void *res = NULL;
+    ngx_str_t str;
+    ngx_str_t *p = NULL;
+    ngx_dns_mx_t *mx = NULL;
+    ngx_dns_soa_t *soa = NULL;
+
+    if(pool == NULL || packet == NULL) {
+        return res;
+    }
+
+    if(index + rr.rdlength > packet_len) {
+        return res;
+    }
+
+    switch (rr.rtype) {
+        case TypeA:
+        case TypeAAAA:
+            str = ngx_dns_ntop(pool, packet+index, rr.rdlength, rr.rtype);
+            p = (ngx_str_t *)ngx_palloc(pool, sizeof(ngx_str_t));
+            if(p == NULL) {
+                return res;
+            }
+            *p = str;
+            res = (void *)p;
+            break;
+        case TypeCNAME:
+        case TypeNS:
+        case TypePTR:
+            index = ngx_dns_get_objname(pool, packet, packet_len, index, &str);
+            if(index > packet_len) {
+                return res;
+            }
+            p = (ngx_str_t *)ngx_palloc(pool, sizeof(ngx_str_t));
+            if(p == NULL) {
+                return res;
+            }
+            *p = str;
+            res = (void *)p;
+            break;
+        case TypeMX:
+            mx = (ngx_dns_mx_t *)ngx_palloc(pool, sizeof(ngx_dns_mx_t));
+            if(mx == NULL) {
+                return res;
+            }
+            mx->preference = ntohs(*((uint16_t *)(packet + index)));
+            index = ngx_dns_get_objname(pool, packet, packet_len, index + 2, &str);
+            if(index > packet_len) {
+                return NULL;
+            }
+            mx->mx = str;
+            res = (void *)mx;
+            break;
+        case TypeSOA:
+            soa = (ngx_dns_soa_t *)ngx_palloc(pool, sizeof(ngx_dns_soa_t));
+            if(soa == NULL) {
+                return res;
+            }
+            index = ngx_dns_get_objname(pool, packet, packet_len, index, &str);
+            if(index > packet_len) {
+                return res;
+            }
+            soa->ns = str;
+            index = ngx_dns_get_objname(pool, packet, packet_len, index, &str);
+            if(index > packet_len) {
+                return res;
+            }
+            soa->mbox = str;
+            if(index + 20 > packet_len) {
+                return res;
+            }
+            soa->serial = ntohl(*((uint32_t *)(packet + index)));
+            index += 4;
+            soa->refresh = ntohl(*((uint32_t *)(packet + index)));
+            index += 4;
+            soa->retry = ntohl(*((uint32_t *)(packet + index)));
+            index += 4;
+            soa->expire = ntohl(*((uint32_t *)(packet + index)));
+            index += 4;
+            soa->minttl = ntohl(*((uint32_t *)(packet + index)));
+            res = (void *)soa;
+            break;
+    }
+
+    return res;
+}
+
 static int
 ngx_dns_read_record(ngx_pool_t *pool, ngx_int_t type,
         u_char *packet, uint16_t packet_len, uint16_t index, void **rr)
@@ -143,6 +270,7 @@ ngx_dns_read_record(ngx_pool_t *pool, ngx_int_t type,
     ngx_dns_question_t **dns_question = NULL;
     ngx_dns_rr_t **dns_rr = NULL;
     ngx_str_t name;
+    ngx_str_t *rdata = NULL;
 
     if(pool == NULL || packet == NULL || rr == NULL) {
         return -1;
@@ -177,14 +305,20 @@ ngx_dns_read_record(ngx_pool_t *pool, ngx_int_t type,
     i += 6;
 
     if(i + (*dns_rr)->rdlength > packet_len) return -1;
-    if((*dns_rr)->rtype == TypeCNAME) {
-        i = ngx_dns_get_objname(pool, packet, packet_len, i, &((*dns_rr)->rdata));
-    } else {
-        (*dns_rr)->rdata.data = ngx_palloc(pool, (*dns_rr)->rdlength);
-        (*dns_rr)->rdata.len = (*dns_rr)->rdlength;
-        ngx_memcpy((*dns_rr)->rdata.data, packet + i, (*dns_rr)->rdata.len);
-        i += (*dns_rr)->rdlength;
+
+    (*dns_rr)->rdata = ngx_dns_decode_rrdata(pool, packet, 
+            packet_len, i, **dns_rr);
+    if((*dns_rr)->rdata == NULL) {
+        rdata = ngx_palloc(pool, sizeof(ngx_str_t));
+        if(rdata == NULL) {
+            return -1;
+        }
+        rdata->data = ngx_palloc(pool, (*dns_rr)->rdlength);
+        rdata->len = (*dns_rr)->rdlength;
+        ngx_memcpy(rdata->data, packet + i, (*dns_rr)->rdlength);
+        (*dns_rr)->rdata = rdata;
     }
+    i += (*dns_rr)->rdlength;
 
     return i;
 }

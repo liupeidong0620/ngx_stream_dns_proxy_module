@@ -1298,14 +1298,14 @@ ngx_stream_variable_dns_answer_context(ngx_stream_session_t *s,
     ngx_stream_dns_proxy_ctx_t  *ctx;
     ngx_dns_rr_t *answer;
     ngx_list_part_t *part;
-    u_char text[NGX_INET6_ADDRSTRLEN + 1] = {};
-    u_char ntext[NGX_INET6_ADDRSTRLEN + 1] = {};
     ngx_str_t context;
     size_t context_len = 0;
     ngx_uint_t i = 0;
-    size_t ip_len = 0;
     u_char *p = NULL;
     ngx_stream_dns_proxy_srv_conf_t  *pscf;
+    ngx_str_t *rdata_str = NULL;
+    ngx_dns_soa_t *soa = NULL;
+    ngx_dns_mx_t *mx = NULL;
 
     pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
     if(pscf == NULL || !pscf->decode_packet_enable) {
@@ -1334,13 +1334,23 @@ ngx_stream_variable_dns_answer_context(ngx_stream_session_t *s,
         }
         // domain len
         context_len += answer[i].name.len;
+        if (answer[i].rdata == NULL) {
+            goto notfind;
+        }
         // data
         if(answer[i].rtype == TypeA) {
-            context_len += NGX_INET_ADDRSTRLEN;
+            context_len += NGX_INET_ADDRSTRLEN + 2;
         } else if(answer[i].rtype == TypeAAAA){
-            context_len += NGX_INET6_ADDRSTRLEN;
+            context_len += NGX_INET6_ADDRSTRLEN + 2;
+        } else if(answer[i].rtype == TypeSOA){
+            soa = (ngx_dns_soa_t *)(answer[i].rdata);
+            context_len += (soa->ns.len + soa->mbox.len + 5 * 10 + 8);
+        } else if(answer[i].rtype == TypeMX) {
+            mx = (ngx_dns_mx_t *)(answer[i].rdata);
+            context_len += (mx->mx.len + 5 + 3);
         } else {
-            context_len += answer[i].rdlength;
+            rdata_str = (ngx_str_t *)(answer[i].rdata);
+            context_len += rdata_str->len + 2;
         }
         // rtype rclass rttl
         context_len += 20;
@@ -1355,7 +1365,7 @@ ngx_stream_variable_dns_answer_context(ngx_stream_session_t *s,
     //p = ngx_snprintf(context.data, context_len, "DNS ANSWER: ");
     // pos += p - context.data;
     for(i = 0; ; i ++) {
-        ip_len = 0;
+        //ip_len = 0;
         if(i >= part->nelts) {
             if(part->next != NULL) {
                 part = part->next;
@@ -1365,32 +1375,53 @@ ngx_stream_variable_dns_answer_context(ngx_stream_session_t *s,
             }
             i = 0;
         }
-        if(answer[i].rtype == TypeA) {
-            ngx_memcpy(ntext, answer[i].rdata.data, answer[i].rdata.len + 1);
-            ntext[answer[i].rdata.len] = '\0';
-            ip_len = ngx_inet_ntop(AF_INET, ntext, text, NGX_INET_ADDRSTRLEN);
-        } else if(answer[i].rtype == TypeAAAA) {
-            ngx_memcpy(ntext, answer[i].rdata.data, answer[i].rdata.len);
-            ntext[answer->rdata.len] = '\0';
-            ip_len = ngx_inet_ntop(AF_INET6, ntext, text, NGX_INET6_ADDRSTRLEN);
-        } else {
-            continue;
+        // rdata
+        if (answer[i].rdata == NULL) {
+            goto notfind;
         }
 
-        if(ip_len != 0) {
+        if(answer[i].rtype == TypeA ||
+                answer[i].rtype == TypeAAAA ||
+                answer[i].rtype == TypePTR ||
+                answer[i].rtype == TypeCNAME ||
+                answer[i].rtype == TypeTXT ||
+                answer[i].rtype == TypeNS) {
+            // name
             p = ngx_cpymem(p, answer[i].name.data, answer[i].name.len);
+            // ttl class type
             p = ngx_snprintf(p, context_len, " %d %s %s ",
                     answer[i].rttl,
                     ngx_dns_class_type_string(answer[i].rclass),
                     ngx_dns_type_string(answer[i].rtype));
-            p = ngx_cpymem(p, text, ip_len);
+            rdata_str = (ngx_str_t *)(answer[i].rdata);
+            p = ngx_cpymem(p, rdata_str->data, rdata_str->len);
+        } else if(answer[i].rtype == TypeSOA){
+            // name
+            p = ngx_cpymem(p, answer[i].name.data, answer[i].name.len);
+            // ttl class type
+            p = ngx_snprintf(p, context_len, " %d %s %s ",
+                    answer[i].rttl,
+                    ngx_dns_class_type_string(answer[i].rclass),
+                    ngx_dns_type_string(answer[i].rtype));
+            soa = (ngx_dns_soa_t *)(answer[i].rdata);
+            p = ngx_cpymem(p, soa->ns.data, soa->ns.len);
+            p = ngx_snprintf(p, context_len, " ");
+            p = ngx_cpymem(p, soa->mbox.data, soa->mbox.len);
+            p = ngx_snprintf(p, context_len, " %d %d %d %d %d",
+                    soa->serial, soa->refresh, soa->retry, soa->expire, soa->minttl);
+        } else if(answer[i].rtype == TypeMX) {
+            p = ngx_cpymem(p, answer[i].name.data, answer[i].name.len);
+            mx = (ngx_dns_mx_t *)(answer[i].rdata);
+            // ttl class type
+            p = ngx_snprintf(p, context_len, " %d %s %s %d ",
+                    answer[i].rttl,
+                    ngx_dns_class_type_string(answer[i].rclass),
+                    ngx_dns_type_string(answer[i].rtype),
+                    mx->preference);
+
+            p = ngx_cpymem(p, mx->mx.data, mx->mx.len);
         } else {
-            p = ngx_cpymem(p, answer[i].name.data, answer[i].name.len);
-            p = ngx_snprintf(p, context_len, " %d %s %s ",
-                    answer[i].rttl,
-                    ngx_dns_class_type_string(answer[i].rclass),
-                    ngx_dns_type_string(answer[i].rtype));
-            p = ngx_cpymem(p, answer[i].rdata.data, answer[i].rdata.len);
+            continue;
         }
         p = ngx_snprintf(p, context_len, "; ");
     }
