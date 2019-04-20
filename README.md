@@ -56,21 +56,21 @@ Formatting DNS answer content.(support A,AAAA,CNAME,TXT,MX,SOA,PTR,NS)
 
 Formatting DNS query content.
 
-### `dns_query_id`
+### `$dns_query_id`
 
-### `dns_query_flags`
+### `$dns_query_flags`
 
-### `dns_reply_code`
+### `$dns_reply_code`
 
-### `dns_reply_flags`
+### `$dns_reply_flags`
 
-### `dns_question_num`
+### `$dns_question_num`
 
-### `dns_answer_num`
+### `$dns_answer_num`
 
-### `dns_authority_num`
+### `$dns_authority_num`
 
-### `dns_additional_num`
+### `$dns_additional_num`
 
 ## Usage
 
