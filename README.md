@@ -50,11 +50,27 @@ Sets the timeout between two successive read or write operations on client or pr
 
 ### `$dns_answer_content`
 
-Formatting DNS answer content.(support only A and AAAA)
+Formatting DNS answer content.(support A,AAAA,CNAME,TXT,MX,SOA,PTR,NS)
 
-### `$dns_question_content`
+### `$dns_query_content`
 
 Formatting DNS query content.
+
+### `dns_query_id`
+
+### `dns_query_flags`
+
+### `dns_reply_code`
+
+### `dns_reply_flags`
+
+### `dns_question_num`
+
+### `dns_answer_num`
+
+### `dns_authority_num`
+
+### `dns_additional_num`
 
 ## Usage
 

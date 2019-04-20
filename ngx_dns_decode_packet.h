@@ -44,8 +44,8 @@ typedef struct {
     ngx_dns_header_t hdr;
     ngx_list_t *question;
     ngx_list_t *answer;
-    ngx_list_t *ns;
-    ngx_list_t *extra;
+    ngx_list_t *au; // authority rrs
+    ngx_list_t *ad; // additional rrs
 } ngx_dns_msg_t;
 
 typedef struct {
