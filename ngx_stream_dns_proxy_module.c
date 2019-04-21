@@ -1679,7 +1679,6 @@ ngx_stream_variable_dns_record_context(ngx_stream_session_t *s,
     u_char *p = NULL;
     ngx_dns_question_t *question;
     ngx_str_t context;
-    ngx_int_t context_len;
     ngx_list_part_t *part;
     ngx_stream_dns_proxy_srv_conf_t  *pscf;
 
@@ -1705,14 +1704,12 @@ ngx_stream_variable_dns_record_context(ngx_stream_session_t *s,
         goto notfind;
     }
 
-    context_len = question->name.len + 30;
-    context.data = ngx_palloc(s->connection->pool, question->name.len + 30);
+    context.data = ngx_palloc(s->connection->pool, question->name.len);
     if(context.data == NULL) {
         goto notfind;
     }
 
     question = (ngx_dns_question_t *)part->elts;
-    //p = ngx_snprintf(context.data, context_len, "DNS QUESTION: ");
     p = context.data;
     p = ngx_cpymem(p, question->name.data, question->name.len);
 
