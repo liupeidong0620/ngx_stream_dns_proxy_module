@@ -40,7 +40,6 @@ typedef struct {
 } ngx_dns_question_t;
 
 typedef struct {
-    //ngx_dns_head_t hdr;
     ngx_dns_header_t hdr;
     ngx_list_t *question;
     ngx_list_t *answer;
@@ -66,20 +65,5 @@ typedef struct {
 void
 ngx_stream_parse_dns_package(ngx_stream_session_t *s, ngx_chain_t *in,
         ngx_uint_t from_upstream);
-
-ngx_str_t 
-ngx_dns_soatostring(ngx_pool_t *pool, ngx_str_t data);
-
-ngx_str_t 
-ngx_dns_mxtostring(ngx_pool_t *pool, ngx_str_t data);
-
-ngx_str_t
-ngx_dns_atostring(ngx_pool_t *pool, ngx_str_t data);
-
-ngx_str_t
-ngx_dns_aaaatostring(ngx_pool_t *pool, ngx_str_t data);
-
-ngx_str_t 
-ngx_dns_cnametostring(ngx_pool_t *pool, ngx_str_t data);
 
 #endif /* NGX_STREAM_DNS_MODULE_H */
