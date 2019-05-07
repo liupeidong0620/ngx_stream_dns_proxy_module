@@ -76,7 +76,7 @@ Formatting DNS query content.
 
 ```
 stream {
-	log_format dnsfmt 'DNS Question: $dns_question_content DNS Answer: $dns_answer_content';
+	log_format dnsfmt 'DNS Question: $dns_query_content DNS Answer: $dns_answer_content';
 	server {
 		listen 53 udp;
 		# dns_proxy_pass 114.114.114.114:53 tcp;
