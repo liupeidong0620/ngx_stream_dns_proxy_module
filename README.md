@@ -52,6 +52,8 @@ Sets the timeout between two successive read or write operations on client or pr
 
 Formatting DNS answer content.(support A,AAAA,CNAME,TXT,MX,SOA,PTR,NS)
 
+### `$dns_query_record`
+
 ### `$dns_query_content`
 
 Formatting DNS query content.
