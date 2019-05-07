@@ -68,6 +68,10 @@ ngx_stream_variable_dns_question_context(ngx_stream_session_t *s,
      ngx_stream_variable_value_t *v, uintptr_t data);
 
 static ngx_int_t
+ngx_stream_variable_dns_record_context(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data);
+
+static ngx_int_t
 ngx_stream_dns_add_vars(ngx_conf_t* cf);
 
 static ngx_int_t
@@ -110,6 +114,10 @@ static ngx_stream_variable_t  ngx_stream_dns_variables[] = {
 
     { ngx_string("dns_query_content"), NULL,
       ngx_stream_variable_dns_question_context, 0,
+      0, 0 },
+
+    { ngx_string("dns_query_record"), NULL,
+      ngx_stream_variable_dns_record_context, 0,
       0, 0 },
 
     { ngx_string("dns_query_id"), NULL,
@@ -1662,6 +1670,66 @@ notfound:
     v->not_found = 1;
     return NGX_OK;
 }
+
+static ngx_int_t
+ngx_stream_variable_dns_record_context(ngx_stream_session_t *s,
+     ngx_stream_variable_value_t *v, uintptr_t data)
+{
+    ngx_stream_dns_proxy_ctx_t  *ctx;
+    u_char *p = NULL;
+    ngx_dns_question_t *question;
+    ngx_str_t context;
+    ngx_int_t context_len;
+    ngx_list_part_t *part;
+    ngx_stream_dns_proxy_srv_conf_t  *pscf;
+
+
+    pscf = ngx_stream_get_module_srv_conf(s, ngx_stream_dns_proxy_module);
+    if(pscf == NULL || !pscf->decode_packet_enable) {
+        goto notfind;
+    }
+
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_dns_proxy_module);
+
+    if (ctx == NULL || ctx->question_msg.question == NULL) {
+        goto notfind;
+    }
+
+    part = &(ctx->question_msg.question->part);
+    if(part->nelts == 0) {
+        goto notfind;
+    }
+
+    question = (ngx_dns_question_t *)part->elts;
+    if(question == NULL) {
+        goto notfind;
+    }
+
+    context_len = question->name.len + 30;
+    context.data = ngx_palloc(s->connection->pool, question->name.len + 30);
+    if(context.data == NULL) {
+        goto notfind;
+    }
+
+    question = (ngx_dns_question_t *)part->elts;
+    //p = ngx_snprintf(context.data, context_len, "DNS QUESTION: ");
+    p = context.data;
+    p = ngx_cpymem(p, question->name.data, question->name.len);
+
+    context.len = p - context.data;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->len = context.len;
+    v->data = context.data;
+
+    return NGX_OK;
+notfind:
+
+    v->not_found = 1;
+    return NGX_OK;
+}
+
 
 static ngx_int_t
 ngx_stream_variable_dns_question_context(ngx_stream_session_t *s,
