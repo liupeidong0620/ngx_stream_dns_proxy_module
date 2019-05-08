@@ -52,6 +52,8 @@ Sets the timeout between two successive read or write operations on client or pr
 
 Formatting DNS answer content.(support A,AAAA,CNAME,TXT,MX,SOA,PTR,NS)
 
+### `$dns_query_record`
+
 ### `$dns_query_content`
 
 Formatting DNS query content.
@@ -76,7 +78,7 @@ Formatting DNS query content.
 
 ```
 stream {
-	log_format dnsfmt 'DNS Question: $dns_question_content DNS Answer: $dns_answer_content';
+	log_format dnsfmt 'DNS Question: $dns_query_content DNS Answer: $dns_answer_content';
 	server {
 		listen 53 udp;
 		# dns_proxy_pass 114.114.114.114:53 tcp;
